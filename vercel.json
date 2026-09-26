@@ -1,0 +1,15 @@
+{
+  "版本": 2,
+  “构建”: [
+    {
+      "src": "backend/app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "路由": [
+    {
+      "src": "/(.*)",
+      "dest": "backend/app.py"
+    }
+  ]
+}
