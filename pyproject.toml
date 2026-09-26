@@ -1,2 +1,7 @@
+[project]
+name = "qqapi"
+version = "0.1.0"
+description = "QQAPI"
+
 [tool.vercel]
 entrypoint = "backend.app:app"
