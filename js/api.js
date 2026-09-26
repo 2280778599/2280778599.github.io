@@ -1,6 +1,7 @@
 /* 前台与后台共用的 API 客户端与工具方法 */
 (function (global) {
-  var API_BASE = "http://127.0.0.1:5000/api";
+  // 前后端同源部署（本地也由 Flask 托管前端），用相对路径即可
+  var API_BASE = "/api";
   var TOKEN_KEY = "qqapi_token";
   var METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 

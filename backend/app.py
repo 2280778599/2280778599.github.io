@@ -1,4 +1,7 @@
-from flask import Flask, jsonify
+import os
+from pathlib import Path
+
+from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
 
@@ -6,6 +9,11 @@ from config import Config
 from extensions import db, jwt
 
 DEFAULT_ADMIN_PASSWORD = "admin123"
+
+# 前端静态资源所在目录（仓库根目录）及允许对外暴露的顶层条目。
+# 白名单之外的路径一律 404，避免把 backend/ 源码和运行期生成的 SQLite 数据库暴露出去。
+FRONTEND_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_ENTRIES = {"index.html", "detail.html", "admin.html", "css", "js"}
 
 
 def _bootstrap_admin(app: Flask) -> None:
@@ -63,9 +71,23 @@ def create_app(config_class=Config) -> Flask:
     def health():
         return jsonify({"status": "ok"})
 
+    # ---- 前端静态资源托管（与 /api/* 同源，无需额外的前端服务器）----
+    @app.get("/")
+    def frontend_index():
+        return send_from_directory(FRONTEND_DIR, "index.html")
+
+    @app.get("/<path:filename>")
+    def frontend_assets(filename: str):
+        if filename.split("/", 1)[0] not in FRONTEND_ENTRIES:
+            abort(404)
+        return send_from_directory(FRONTEND_DIR, filename)
+
     @app.errorhandler(404)
     def not_found(_error):
-        return jsonify({"message": "接口或资源不存在"}), 404
+        # 接口请求仍返回 JSON；页面请求回落到首页，但保留 404 状态码
+        if request.path.startswith("/api/"):
+            return jsonify({"message": "接口或资源不存在"}), 404
+        return send_from_directory(FRONTEND_DIR, "index.html"), 404
 
     @app.errorhandler(405)
     def method_not_allowed(_error):
@@ -98,4 +120,6 @@ def create_app(config_class=Config) -> Flask:
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # 本地开发用；线上由 gunicorn 启动，不会走到这里
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
