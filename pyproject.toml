@@ -1,0 +1,6 @@
+[项目]
+名称 = "my-api"
+要求的Python版本 = "=3.11"
+
+[vercel工具]
+入口点 = "backend.app: app"
