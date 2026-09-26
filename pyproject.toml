@@ -1,2 +1,6 @@
+[project]
+name = "my-api"
+requires-python = "~=3.12.0"
+
 [tool.vercel]
 entrypoint = "backend.app: app"
