@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QQAPI · 公开 API 目录</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" v-cloak>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="logo" href="index.html">QQAPI<span>公开 API 目录</span></a>
+
+      <div class="search">
+        <input v-model.trim="keyword" placeholder="搜索 API 名称或分类，如：天气、娱乐"
+               @keyup.enter="loadApis">
+        <button class="primary" type="button" @click="loadApis">搜索</button>
+      </div>
+
+      <a class="ghost-link" href="admin.html">管理后台</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>公开 API 目录</h1>
+      <p class="hero-sub">
+        共收录 <strong>{{ total }}</strong> 个 API，全部无需登录即可浏览、查看文档与在线调试。
+      </p>
+    </section>
+
+    <div class="chips">
+      <button class="chip" type="button" :class="{ active: filterCategory === '' }"
+              @click="filterCategory = ''; loadApis()">全部</button>
+      <button v-for="c in categories" :key="c" class="chip" type="button"
+              :class="{ active: filterCategory === c }"
+              @click="filterCategory = c; loadApis()">{{ c }}</button>
+    </div>
+
+    <p v-if="error" class="msg error">{{ error }}</p>
+
+    <div class="grid">
+      <article v-for="api in apis" :key="api.id" class="api-card">
+        <div class="card-top">
+          <span class="badge" :class="'m-' + api.method">{{ api.method }}</span>
+          <span class="cat">{{ api.category }}</span>
+        </div>
+
+        <h2 class="card-title">{{ api.name }}</h2>
+        <p class="card-desc">{{ api.description || '暂无简介描述' }}</p>
+
+        <div class="card-meta">
+          <a v-if="api.link" class="card-link" :href="api.link" target="_blank" rel="noopener">
+            {{ api.link }}
+          </a>
+          <span v-else class="muted">暂无项目 / 参考链接</span>
+          <span class="updated">更新于 {{ formatTime(api.updated_at) }}</span>
+        </div>
+
+        <div class="card-foot">
+          <a class="primary btn-doc" :href="'detail.html?id=' + api.id">查看文档</a>
+        </div>
+      </article>
+    </div>
+
+    <p v-if="loading" class="empty">正在加载 API 列表…</p>
+    <p v-else-if="!apis.length" class="empty">没有匹配的 API，换个关键词或分类试试</p>
+  </main>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="js/api.js"></script>
+<script src="js/public.js"></script>
+</body>
+</html>

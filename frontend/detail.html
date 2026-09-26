@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 文档 · QQAPI</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" v-cloak>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="logo" href="index.html">QQAPI<span>公开 API 目录</span></a>
+      <a class="ghost-link" href="index.html">← 返回列表</a>
+    </div>
+  </header>
+
+  <main class="container narrow">
+    <p v-if="error" class="msg error">{{ error }}</p>
+    <p v-if="loading" class="empty">正在加载 API 文档…</p>
+
+    <template v-if="api">
+      <div class="card">
+        <div class="detail-head">
+          <span class="badge" :class="'m-' + api.method">{{ api.method }}</span>
+          <h1>{{ api.name }}</h1>
+          <span class="cat">{{ api.category }}</span>
+        </div>
+
+        <div class="path-row">
+          <code>{{ api.full_url }}</code>
+          <button class="ghost" type="button" @click="copy(api.full_url, 'url')">
+            {{ copied === 'url' ? '已复制' : '复制链接' }}
+          </button>
+        </div>
+
+        <dl class="meta">
+          <dt>分类</dt>
+          <dd>{{ api.category }}</dd>
+          <dt>简介</dt>
+          <dd>{{ api.description || '暂无简介描述' }}</dd>
+          <dt>参考链接</dt>
+          <dd>
+            <a v-if="api.link" :href="api.link" target="_blank" rel="noopener">{{ api.link }}</a>
+            <span v-else class="muted">暂无</span>
+          </dd>
+          <dt>更新时间</dt>
+          <dd>{{ formatTime(api.updated_at) }}</dd>
+        </dl>
+      </div>
+
+      <!-- 在线调试 -->
+      <div class="card section">
+        <div class="section-head">
+          <h2>在线调试</h2>
+          <span class="code-hint">请求由平台服务端真实发出，结果会记录到下方历史测试记录</span>
+        </div>
+
+        <div class="playground">
+          <div class="row">
+            <select v-model="test.method">
+              <option v-for="m in methods" :key="m" :value="m">{{ m }}</option>
+            </select>
+            <input v-model.trim="test.url" placeholder="请求地址">
+          </div>
+
+          <label>查询参数（JSON 对象，可留空）</label>
+          <textarea v-model="test.paramsText" rows="3" spellcheck="false"></textarea>
+
+          <template v-if="test.method !== 'GET' && test.method !== 'HEAD'">
+            <label>请求体（JSON，可留空）</label>
+            <textarea v-model="test.bodyText" rows="4" spellcheck="false"></textarea>
+          </template>
+
+          <div>
+            <button class="primary" type="button" :disabled="testing" @click="sendTest">
+              {{ testing ? '发送中...' : '发送请求' }}
+            </button>
+          </div>
+        </div>
+
+        <p v-if="testError" class="msg error">{{ testError }}</p>
+
+        <div v-if="testResult" class="test-result">
+          <div class="bar">
+            <span :class="testResult.response.success ? 'code-ok' : 'code-bad'">
+              {{ testResult.response.status_code !== null
+                 ? 'HTTP ' + testResult.response.status_code
+                 : '请求未完成' }}
+            </span>
+            <span>耗时 {{ testResult.response.duration_ms }} ms</span>
+            <span v-if="testResult.response.error">{{ testResult.response.error }}</span>
+            <span v-if="testResult.response.truncated" class="code-hint">（响应体已截断）</span>
+          </div>
+          <pre class="body">{{ testBody }}</pre>
+        </div>
+      </div>
+
+      <!-- 响应示例 -->
+      <div class="card section">
+        <div class="section-head">
+          <h2>标准响应示例</h2>
+          <button v-if="api.response_example" class="ghost" type="button"
+                  @click="copy(api.response_example, 'example')">
+            {{ copied === 'example' ? '已复制' : '复制' }}
+          </button>
+        </div>
+        <div v-if="api.response_example" class="code-block">
+          <pre>{{ examplePretty }}</pre>
+        </div>
+        <p v-else class="code-hint">管理员尚未填写该 API 的响应示例。</p>
+      </div>
+
+      <!-- 历史测试记录 -->
+      <div class="card section">
+        <div class="section-head">
+          <h2>历史测试记录</h2>
+          <button class="ghost" type="button" @click="loadRecords">刷新</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px">方法</th>
+              <th style="width:100px">状态码</th>
+              <th style="width:90px">耗时</th>
+              <th style="width:170px">时间</th>
+              <th>结果</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!records.length">
+              <td colspan="5" class="empty">暂无测试记录，发送一次请求试试</td>
+            </tr>
+            <tr v-for="rec in records" :key="rec.id">
+              <td><span class="badge" :class="'m-' + rec.method">{{ rec.method }}</span></td>
+              <td class="mono">{{ rec.status_code !== null ? rec.status_code : '-' }}</td>
+              <td class="mono">{{ rec.duration_ms }} ms</td>
+              <td class="mono">{{ formatTime(rec.created_at) }}</td>
+              <td>
+                <span v-if="rec.success" class="status on">成功</span>
+                <span v-else class="status off">{{ rec.error || '失败' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </main>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="js/api.js"></script>
+<script src="js/detail.js"></script>
+</body>
+</html>

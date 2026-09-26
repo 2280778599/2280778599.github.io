@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QQAPI · 后台管理</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" v-cloak>
+  <!-- 未登录：管理员登录 -->
+  <div v-if="!token" class="auth-wrap">
+    <div class="card auth-card">
+      <h1>后台管理登录</h1>
+      <p class="subtitle">QQAPI · API 文档与在线调试平台</p>
+
+      <form @submit.prevent="login">
+        <label>用户名</label>
+        <input v-model.trim="loginForm.username" placeholder="请输入管理员用户名" autocomplete="username">
+        <label>密码</label>
+        <input v-model="loginForm.password" type="password" placeholder="请输入密码" autocomplete="current-password">
+        <button class="primary block" type="submit" :disabled="loading">
+          {{ loading ? '登录中...' : '登录' }}
+        </button>
+      </form>
+
+      <p v-if="error" class="msg error">{{ error }}</p>
+      <p class="hint">管理员账号由后端环境变量 ADMIN_USERNAME / ADMIN_PASSWORD 创建，平台不提供公开注册。</p>
+      <p class="auth-foot"><a href="index.html">← 返回前台</a></p>
+    </div>
+  </div>
+
+  <!-- 已登录：管理台 -->
+  <div v-else>
+    <header class="site-header">
+      <div class="brand">QQAPI <span>· 后台管理</span></div>
+      <div class="header-right">
+        <span class="username">{{ user ? user.username : '' }}</span>
+        <a href="index.html">查看前台</a>
+        <button class="ghost" type="button" @click="logout()">退出登录</button>
+      </div>
+    </header>
+
+    <main class="admin-container">
+      <div class="admin-grid">
+        <!-- 新增 / 编辑表单 -->
+        <div class="card">
+          <h2>{{ editingId !== null ? '编辑 API #' + editingId : '新增 API' }}</h2>
+          <form @submit.prevent="save">
+            <label>名称 *</label>
+            <input v-model.trim="form.name" placeholder="例如：获取用户列表">
+
+            <label>请求方法 *</label>
+            <select v-model="form.method">
+              <option v-for="m in methods" :key="m" :value="m">{{ m }}</option>
+            </select>
+
+            <label>请求路径 *</label>
+            <input v-model.trim="form.path" placeholder="例如：/api/users">
+
+            <label>基址（用于在线调试转发，可留空）</label>
+            <input v-model.trim="form.base_url" placeholder="例如：https://api.example.com">
+
+            <label>项目 / 参考链接（前台展示给用户，可留空）</label>
+            <input v-model.trim="form.link" placeholder="例如：https://github.com/xxx/xxx">
+
+            <label>分类</label>
+            <input v-model.trim="form.category" placeholder="例如：娱乐 / 工具">
+
+            <label>描述</label>
+            <textarea v-model="form.description" rows="3" placeholder="这个 API 做什么"></textarea>
+
+            <label>标准响应示例（JSON）</label>
+            <textarea v-model="form.response_example" rows="6" spellcheck="false"
+                      placeholder='{"code": 0, "data": []}'></textarea>
+
+            <div class="checkbox-row">
+              <input id="enabled" type="checkbox" v-model="form.is_enabled">
+              <label for="enabled">上架（在前台公开，取消勾选即下架）</label>
+            </div>
+
+            <div class="form-actions">
+              <button class="primary" type="submit" :disabled="loading">
+                {{ editingId !== null ? '保存修改' : '创建' }}
+              </button>
+              <button v-if="editingId !== null" class="ghost" type="button" @click="resetForm">取消编辑</button>
+            </div>
+          </form>
+
+          <p v-if="error" class="msg error">{{ error }}</p>
+        </div>
+
+        <!-- API 列表 -->
+        <div class="card">
+          <div class="section-head">
+            <h2>API 列表（{{ total }}）</h2>
+            <div class="header-right">
+              <input v-model.trim="keyword" placeholder="搜索名称 / 路径 / 分类" @keyup.enter="loadApis">
+              <button class="ghost" type="button" @click="loadApis">搜索</button>
+            </div>
+          </div>
+
+          <p v-if="info" class="msg info">{{ info }}</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px">ID</th>
+                <th style="width:60px">方法</th>
+                <th>名称 / 路径</th>
+                <th style="width:110px">分类</th>
+                <th style="width:80px">状态</th>
+                <th style="width:150px">更新时间</th>
+                <th style="width:250px">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!apis.length">
+                <td colspan="7" class="empty">暂无数据，先在左侧新增一个 API</td>
+              </tr>
+              <tr v-for="api in apis" :key="api.id">
+                <td>{{ api.id }}</td>
+                <td><span class="badge" :class="'m-' + api.method">{{ api.method }}</span></td>
+                <td>
+                  <div>{{ api.name }}</div>
+                  <code class="mono">{{ api.path }}</code>
+                </td>
+                <td>{{ api.category }}</td>
+                <td>
+                  <span class="status" :class="api.is_enabled ? 'on' : 'off'">
+                    {{ api.is_enabled ? '已上架' : '已下架' }}
+                  </span>
+                </td>
+                <td class="mono">{{ formatTime(api.updated_at) }}</td>
+                <td class="ops">
+                  <button class="link" type="button" @click="edit(api)">编辑</button>
+                  <button class="link" type="button" @click="toggleStatus(api)">
+                    {{ api.is_enabled ? '下架' : '上架' }}
+                  </button>
+                  <a class="link" :href="'detail.html?id=' + api.id" target="_blank">文档</a>
+                  <button class="link" type="button" @click="clearRecords(api)">清空记录</button>
+                  <button class="link danger" type="button" @click="remove(api)">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="js/api.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
