@@ -1,3 +1,4 @@
+import binascii
 import os
 from pathlib import Path
 
@@ -70,6 +71,43 @@ def create_app(config_class=Config) -> Flask:
     @app.get("/api/health")
     def health():
         return jsonify({"status": "ok"})
+
+    @app.get("/api/keygen")
+    def keygen():
+        from aes_lite import aes128_ecb_encrypt
+
+        def i32(x):
+            x &= 0xFFFFFFFF
+            return x - 0x100000000 if x >= 0x80000000 else x
+
+        raw_id = (request.args.get("id") or "").strip()
+        if not raw_id:
+            return jsonify({"code": 1, "message": "missing id"}), 400
+        try:
+            id_int = int(raw_id)
+            add = int((request.args.get("add") or "1758759").strip())
+        except ValueError:
+            return jsonify({"code": 1, "message": "id/add must be integer"}), 400
+
+        nt = (request.args.get("nt") or "0").strip() == "1"
+        time_str = request.args.get("time") or ""
+
+        half = id_int // 2 if id_int >= 0 else -((-id_int) // 2)
+        v = i32(half + add)
+        h = format(v & 0xFFFFFFFF, "x") if v < 0 else format(v, "x")
+        if nt:
+            h = h + "z" + time_str
+        enc = aes128_ecb_encrypt(b"Format2044153997", h.encode("utf-8"))
+        return jsonify(
+            {
+                "code": 0,
+                "id": id_int,
+                "add": add,
+                "input": h,
+                "key": binascii.hexlify(enc).decode(),
+            }
+        )
+
 
     # ---- 前端静态资源托管（与 /api/* 同源，无需额外的前端服务器）----
     @app.get("/")
